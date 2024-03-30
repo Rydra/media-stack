@@ -1,5 +1,5 @@
 version: "3.9"
-name: media-stack
+name: ${PROJECT_NAME}
 services:
 
   # To use/enable VPN, Run this compose file with --profile=vpn. Its highly recommended to use VPN.
@@ -68,15 +68,16 @@ services:
 
     # Unomment below line if vpn is enabled
     # network_mode: service:vpn
-
     environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=UTC
+      - PUID=${PUID}
+      - PGID=${PGID}
+      # - UMASK=002
       - WEBUI_PORT=5080
+      - TZ=${TIMEZONE}
+      - TORRENTING_PORT=6881
     volumes:
       - qbittorrent-config:/config
-      - torrent-downloads:/downloads
+      - ${DOWNLOADS_PATH}:/downloads
 
     ## Comment/Disable below ports if VPN is enabled
     ports:
@@ -85,27 +86,63 @@ services:
       - 6881:6881/udp
     restart: "unless-stopped"
 
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    restart: unless-stopped
+    ports:
+      - "8191:8191"
+    environment:
+      - LOG_LEVEL=info
+      - LOG_HTML=false
+      - CAPTCHA_SOLVER=none
+      - TZ=${TIMEZONE}
+    networks:               # Comment this line if vpn is enabled
+      - mynetwork           # Comment this line if vpn is enabled
+
   radarr:
     container_name: radarr
-    image: lscr.io/linuxserver/radarr:5.3.6
+    image: lscr.io/linuxserver/radarr:latest
     networks:
       - mynetwork   # Comment this line if VPN is enabled
     ## Uncomment below lines if VPN is enabled
     #   mynetwork:
     #     ipv4_address: ${RADARR_STATIC_CONTAINER_IP} # It should be available IPv4 address in range of docker network `mynetwork` e.g. 172.20.0.2
     environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=UTC
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TIMEZONE}
     ports:
       - 7878:7878
     volumes:
       - radarr-config:/config
-      - torrent-downloads:/downloads
+      - ${DOWNLOADS_PATH}:/downloads
+      - ${MOVIES_PATH}:/media/movies
+    restart: "unless-stopped"
+
+  bazarr:
+    container_name: bazarr
+    image: lscr.io/linuxserver/bazarr:latest
+    networks:
+      - mynetwork   # Comment this line if VPN is enabled
+    ## Uncomment below lines if VPN is enabled
+    #   mynetwork:
+    #     ipv4_address: ${RADARR_STATIC_CONTAINER_IP} # It should be available IPv4 address in range of docker network `mynetwork` e.g. 172.20.0.2
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TIMEZONE}
+    ports:
+      - 6767:6767
+    volumes:
+      - bazarr-config:/config
+      - ${DOWNLOADS_PATH}:/downloads
+      - ${MOVIES_PATH}:/media/movies
+      - ${TVSHOWS_PATH}:/media/tvshows
     restart: "unless-stopped"
 
   sonarr:
-    image: linuxserver/sonarr:4.0.1-develop
+    image: linuxserver/sonarr:latest
     container_name: sonarr
     networks:
       - mynetwork   # Comment this line if VPN is enabled
@@ -113,12 +150,13 @@ services:
     #   mynetwork:
     #     ipv4_address: ${SONARR_STATIC_CONTAINER_IP} # It should be available IPv4 address in range of docker network `mynetwork` e.g. 172.20.0.2
     environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=UTC
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TIMEZONE}
     volumes:
       - sonarr-config:/config
-      - torrent-downloads:/downloads
+      - ${DOWNLOADS_PATH}:/downloads
+      - ${TVSHOWS_PATH}:/media/tvshows
     ports:
       - 8989:8989
     restart: unless-stopped
@@ -135,9 +173,9 @@ services:
     networks:               # Comment this line if vpn is enabled
       - mynetwork           # Comment this line if vpn is enabled
     environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=UTC
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TIMEZONE}
     volumes:
       - prowlarr-config:/config
 
@@ -147,17 +185,19 @@ services:
     restart: unless-stopped
 
   jellyfin:
-    image: linuxserver/jellyfin:10.8.13
+    image: linuxserver/jellyfin:latest
     container_name: jellyfin
     networks:
       - mynetwork
     environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=UTC
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - UMASK=002
+      - TZ=${TIMEZONE}
     volumes:
       - jellyfin-config:/config
-      - torrent-downloads:/data
+      - ${MOVIES_PATH}:/data/movies
+      - ${TVSHOWS_PATH}:/data/tvshows
   # devices:
    #  - /dev/videoN:/dev/videoN # Mount GPU device 
     ports:
@@ -197,12 +237,12 @@ services:
     # - CMA_RADARR_ENABLE_NOTIFICATION=${CMA_RADARR_ENABLE_NOTIFICATION:-""}
 
 volumes:
-  torrent-downloads:
   radarr-config:
   sonarr-config:
   prowlarr-config:
   jellyfin-config:
   qbittorrent-config:
+  bazarr-config:
   # cleanmyarr-config:
 
 networks:
